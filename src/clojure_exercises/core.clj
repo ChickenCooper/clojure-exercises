@@ -417,3 +417,174 @@
 
 (sum-to
  [N])
+
+;; this is naive because, among other issues, it doesn't make use of tail
+;; recursion optimization, we can simply substitute our recursive calls with
+;; recur to enable tail call optimization
+(defn sum
+  ([values] (sum 0 values))
+  ([acc, values]
+   (if (empty? values)
+     acc
+     (sum (+ acc (first values)) (rest values)))))
+(sum [1 2 3 4])
+
+;; this is the improved version
+(defn sum
+  ([values] (sum 0 values))
+  ([acc, values]
+   (if (empty? values)
+     acc
+     (recur (+ acc (first values)) (rest values)))))
+(sum [1 2 3 4])
+
+;;we can also forgo the accumulator, but this is no longer tail recursive
+(defn sum
+  [values]
+   (if (empty? values)
+     0
+     (+ (first values) (sum ( rest values )))))
+(sum [1 2 3 4])
+
+;; this looks very inneficient because I keep repeating maps, but
+;; in clojure most operations like map, reduce, filter... return lazy sequences
+;; so actually this is about the same as joining all these operations into a single map
+(defn caesar-decode
+  [key, message]
+  (->> (seq message)
+       (map int)
+       (map #(+ % key))
+       (map #(- % 65))
+       (map #(mod % 26))
+       (map #(+ 65 %))
+       (map char)
+       (apply str))
+  )
+(caesar-decode -1 "ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+;; this code doesn't deal with spaces, to deal with spaces,
+;; it would have to be refactored into a single map so that we can case on spaces
+
+(def char-base (int \A))
+
+(defn caeser-decode
+  [key message]
+  (->> (seq message)
+       (map (fn [chr]
+              (if (= chr \space)
+               \space
+               (-> (int chr)
+                   (- char-base)
+                   (+ key)
+                   (mod 26)
+                   (+ char-base)
+                   char))))
+       (apply str)))
+
+(defn key-by
+  [f items]
+  (reduce (fn [coll a] (assoc coll (f a) a))
+          {}
+          items))
+(key-by hash ["Alice" "Bob"])
+
+(def multi-todo {"Alice"
+                 {:todo #{1 2 3 4 5}
+                  :done #{7 8 9 10 11}}
+                 "Bob"
+                 {:todo #{1 2 3 4 5}
+                  :done #{7 8 9 10 11}}
+                })
+(defn incomplete-tasks-for
+  [user-id]
+  (:todo ( multi-todo user-id )))
+(incomplete-tasks-for "Alice")
+(defn completed-tasks-for
+  [user-id]
+  (:done ( multi-todo user-id )))
+(defn remove-todo-for
+  [user-id task]
+  (assoc-in multi-todo [user-id :todo] ( disj (incomplete-tasks-for user-id) task)))
+(remove-todo-for "Alice" 2)
+
+;;I didn't quite understand the prompt, this is cool, it uses filter with a
+;;keyword literal as its predicate.
+(def todo-list-state
+  {:users {1 {:name "rafd"}
+           2 {:name "jamesnvc"}}
+   :tasks [{:id 1
+            :completed? false
+            :created-user-id 1
+            :assigned-user-id 2
+            :created-at #inst "2019-10-24T19:47:05-05:00"
+            :content "Get everything ready for teaching"}
+           {:id 2
+            :completed? true
+            :created-user-id 2
+            :assigned-user-id 2
+            :created-at #inst "2019-10-20T19:47:05-05:00"
+            :content "Make a bunch of exercises"}
+           {:id 3
+            :completed? false
+            :created-user-id 2
+            :assigned-user-id 1
+            :created-at #inst "2019-10-27T19:47:05-05:00"
+            :content "Teach the class"}]})
+
+(defn incomplete-tasks-for
+  [state user-id]
+  (filter (fn [task]
+            (= user-id (task :assigned-user-id)))
+          (state :tasks)))
+
+(defn completed-tasks [state] (filter :completed? (state :tasks)))
+(defn deltas
+  [values]
+  (->> (partition 2 1 values)
+       (map #(apply - (reverse %)))
+       (apply vector)))
+(deltas [1 2 34])
+
+(defn deltas
+  [values]
+  (->> (partition 2 1 values)
+       (map #(apply - (reverse %)))
+       (apply vector)))
+(deltas [1 2 34])
+
+;; woah, check this solution out
+(defn deltas [nums] (map - (rest nums) nums))
+(deltas [1 2 34])
+
+;; this is the better way to write what I wrote
+(defn deltas-v2
+  [nums]
+  (->> nums
+       (partition 2 1)
+       (map (fn [[a b]]
+              (- b a)))))
+(deltas [1 2 34])
+
+;;debug this code:
+(defn process
+  "For a given list, return the sum of all the numbers as well as all the values as strings."
+  [things]
+  (let [sum (atom 0)
+        str-things (for [thing things]
+                     (do (when (number? thing)
+                          (swap! sum + thing))
+                         (str thing)))]
+    {:str-things str-things
+     :sum (deref sum)}))
+
+;;debugged code
+(defn process
+  "For a given list, return the sum of all the numbers as well as all the values as strings."
+  [things]
+  (let [sum (atom 0)
+        str-things (for [thing things]
+                     (do (when (number? thing)
+                          (swap! (+ sum thing)))
+                         (str thing)))]
+    {:str-things str-things
+     :sum (deref sum)}))
+(process ["hello" 2 :world 1])
